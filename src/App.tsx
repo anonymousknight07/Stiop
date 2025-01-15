@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Clock } from './components/Clock';
 import { Stopwatch } from './components/Stopwatch';
 import { Timer } from './components/Timer';
 import { Notes } from './components/Notes';
 import { Planner } from './components/Planner';
 import { Settings } from './components/Settings';
-import { Cog, Clock as ClockIcon, Timer as TimerIcon, Watch, StickyNote, Calendar, Menu } from 'lucide-react';
+import { Clock as ClockIcon, Timer as TimerIcon, Watch, StickyNote, Calendar, Menu } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('clock');
