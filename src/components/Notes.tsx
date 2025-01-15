@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import  { useState, useEffect } from 'react';
 import { Search, Plus, Trash2, Bold, Italic, List, Link, ArrowUp, ArrowDown } from 'lucide-react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
