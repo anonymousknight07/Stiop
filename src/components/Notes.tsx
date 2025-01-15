@@ -1,5 +1,5 @@
-import  { useState, useEffect } from 'react';
-import { Search, Plus, Trash2, Bold, Italic, List, Link, ArrowUp, ArrowDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, Trash2, Bold, Italic, List, Link, ArrowUp, ArrowDown, CheckSquare } from 'lucide-react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
@@ -97,6 +97,9 @@ export function Notes() {
       case 'link':
         insertion = `[${text.slice(start, end) || 'link text'}](url)`;
         break;
+      case 'checkbox':
+        insertion = `\n- [ ] ${text.slice(start, end) || 'task'}`;
+        break;
     }
 
     const newText = text.slice(0, start) + insertion + text.slice(end);
@@ -109,11 +112,72 @@ export function Notes() {
     }, 0);
   };
 
-  const renderMarkdown = (content: string) => {
-    const html = marked(content, { breaks: true });
-    const sanitized = DOMPurify.sanitize(html);
-    return { __html: sanitized };
+  const toggleCheckbox = (noteId: string, checkboxIndex: number) => {
+    setNotes(notes.map(note => {
+      if (note.id === noteId) {
+        const lines = note.content.split('\n');
+        let currentIndex = 0;
+        
+        const newLines = lines.map(line => {
+          if (line.match(/^- \[([ x])\]/)) {
+            if (currentIndex === checkboxIndex) {
+              return line.includes('[ ]') 
+                ? line.replace('[ ]', '[x]') 
+                : line.replace('[x]', '[ ]');
+            }
+            currentIndex++;
+          }
+          return line;
+        });
+        
+        return { ...note, content: newLines.join('\n') };
+      }
+      return note;
+    }));
   };
+
+  const renderMarkdown = (content: string, noteId: string) => {
+    // Create a custom renderer for checkboxes
+    const renderer = new marked.Renderer();
+    let checkboxIndex = 0;
+
+    renderer.listitem = (text) => {
+      const checkbox = text.match(/^\[([ x])\] (.+)/);
+      if (checkbox) {
+        const checked = checkbox[1] === 'x';
+        const itemContent = checkbox[2];
+        const currentIndex = checkboxIndex++;
+        
+        return `
+          <div class="flex items-start gap-2">
+            <input
+              type="checkbox"
+              ${checked ? 'checked' : ''}
+              onclick="document.dispatchEvent(new CustomEvent('toggleCheckbox', { detail: { noteId: '${noteId}', index: ${currentIndex} } }))"
+              class="mt-1 rounded border-gray-400"
+            />
+            <span class="${checked ? 'line-through opacity-70' : ''}">${itemContent}</span>
+          </div>
+        `;
+      }
+      return `<li>${text}</li>`;
+    };
+
+    const html = marked(content, { renderer, breaks: true });
+    return DOMPurify.sanitize(html);
+  };
+
+  useEffect(() => {
+    const handleToggleCheckbox = (event: CustomEvent) => {
+      const { noteId, index } = event.detail;
+      toggleCheckbox(noteId, index);
+    };
+
+    document.addEventListener('toggleCheckbox', handleToggleCheckbox as EventListener);
+    return () => {
+      document.removeEventListener('toggleCheckbox', handleToggleCheckbox as EventListener);
+    };
+  }, [notes]);
 
   const navigateMatches = (direction: 'next' | 'prev') => {
     if (totalMatches === 0) return;
@@ -127,16 +191,15 @@ export function Notes() {
   };
 
   const highlightSearch = (content: string, noteId: string) => {
-    if (!searchTerm) return renderMarkdown(content);
+    if (!searchTerm) return { __html: renderMarkdown(content, noteId) };
     
-    const html = marked(content, { breaks: true });
-    const sanitized = DOMPurify.sanitize(html);
+    const html = renderMarkdown(content, noteId);
     
     const noteMatch = searchMatches.find(match => match.noteId === noteId);
-    if (!noteMatch) return { __html: sanitized };
+    if (!noteMatch) return { __html: html };
 
     let matchCount = 0;
-    const highlighted = sanitized.replace(
+    const highlighted = html.replace(
       new RegExp(searchTerm, 'gi'),
       (match) => {
         matchCount++;
@@ -229,12 +292,19 @@ export function Notes() {
               >
                 <Link size={16} />
               </button>
+              <button
+                onClick={() => insertFormatting('checkbox')}
+                className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[#003049]/10"
+                title="Checkbox (- [ ] task)"
+              >
+                <CheckSquare size={16} />
+              </button>
             </div>
           )}
           <div className="flex flex-col xs:flex-row gap-2 xs:gap-3">
             <textarea
               id="newNoteInput"
-              placeholder="New note... (Supports Markdown: **bold**, *italic*, - bullets, [links](url))"
+              placeholder="New note... (Supports Markdown: **bold**, *italic*, - bullets, [links](url), - [ ] checkbox)"
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
               className="flex-1 bg-[#fdf0d5] text-[#003049] px-3 xs:px-4 py-2 rounded-lg text-sm xs:text-base min-h-[100px]"
